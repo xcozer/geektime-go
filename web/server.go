@@ -50,7 +50,7 @@ func (h *HTTPServer) serve(ctx *Context) {
 
 func (h *HTTPServer) AddRoute(method string, path string, handleFunc HandleFunc) {
 	// 这里注册到路由树里面
-	panic("implement me")
+	// panic("implement me")
 }
 
 func (h *HTTPServer) Get(path string, handleFunc HandleFunc) {
