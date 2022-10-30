@@ -109,6 +109,12 @@ func (r *router) findRoute(method string, path string) (*node, bool) {
 }
 
 func (n *node) childOrCreate(seg string) *node {
+	if seg == "*" {
+		n.starChild = &node{
+			path: seg,
+		}
+		return n.starChild
+	}
 	if n.children == nil {
 		n.children = map[string]*node{}
 	}
@@ -123,11 +129,15 @@ func (n *node) childOrCreate(seg string) *node {
 	return res
 }
 
+// childOf 优先考虑静态匹配，匹配不上，再考虑通配符匹配
 func (n *node) childOf(path string) (*node, bool) {
 	if n.children == nil {
-		return nil, false
+		return n.starChild, n.starChild != nil
 	}
 	child, ok := n.children[path]
+	if !ok {
+		return n.starChild, n.starChild != nil
+	}
 	return child, ok
 }
 
@@ -138,8 +148,12 @@ func (n *node) childOf(path string) (*node, bool) {
 type node struct {
 	path string
 
+	// 静态匹配的节点
 	// 子 path 到子节点的映射
 	children map[string]*node
+
+	// 加一个通配符匹配
+	starChild *node
 
 	// 缺一个代表用户注册的业务逻辑
 	handler HandleFunc

@@ -34,8 +34,12 @@ func TestServer(t *testing.T) {
 	//
 	// })
 
-	h.addRoute(http.MethodGet, "/order/detail", func(ctx *Context) {
+	h.Get("/order/detail", func(ctx *Context) {
 		ctx.Resp.Write([]byte("hello, order detail"))
+	})
+
+	h.Get("/order/abc", func(ctx *Context) {
+		ctx.Resp.Write([]byte(fmt.Sprintf("hello, %s", ctx.Req.URL.Path)))
 	})
 
 	// h.addRoute1(http.MethodGet, "/user", handler1, handler2)
