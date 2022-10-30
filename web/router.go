@@ -78,7 +78,7 @@ func (r *router) addRoute(method string, path string, handleFunc HandleFunc) {
 	root.handler = handleFunc
 }
 
-func (r *router) findRoute(method string, path string) (*node, bool) {
+func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 	// 基本上是不是也是沿着树深度查找下去？
 	root, ok := r.trees[method]
 	if !ok {
@@ -86,7 +86,9 @@ func (r *router) findRoute(method string, path string) (*node, bool) {
 	}
 
 	if path == "/" {
-		return root, true
+		return &matchInfo{
+			n: root,
+		}, true
 	}
 
 	// 这里把前置和后置的 / 都去掉
@@ -94,27 +96,54 @@ func (r *router) findRoute(method string, path string) (*node, bool) {
 
 	// 按照斜杠切割
 	segs := strings.Split(path, "/")
+	var pathParams map[string]string
 	for _, seg := range segs {
-		child, found := root.childOf(seg)
+		child, paramChild, found := root.childOf(seg)
 		if !found {
 			return nil, false
+		}
+		// 命中了路径参数
+		if paramChild {
+			if pathParams == nil {
+				pathParams = make(map[string]string)
+			}
+			// path 是 :id 这种形式
+			pathParams[child.path[1:]] = seg
 		}
 		root = child
 	}
 	// 代表我确实有这个节点
 	// 但是节点是不是用户注册的有 handler 的，就不一定了
-	return root, true
+	return &matchInfo{
+		n:          root,
+		pathParams: pathParams,
+	}, true
 
 	// return root, root.handler != nil
 }
 
 func (n *node) childOrCreate(seg string) *node {
+
+	if seg[0] == ':' {
+		if n.starChild != nil {
+			panic("web: 不允许同时注册路径参数和通配符匹配，已有通配符匹配")
+		}
+		n.paramChild = &node{
+			path: seg,
+		}
+		return n.paramChild
+	}
+
 	if seg == "*" {
+		if n.paramChild != nil {
+			panic("web: 不允许同时注册路径参数和通配符匹配，已有路径参数")
+		}
 		n.starChild = &node{
 			path: seg,
 		}
 		return n.starChild
 	}
+
 	if n.children == nil {
 		n.children = map[string]*node{}
 	}
@@ -130,15 +159,24 @@ func (n *node) childOrCreate(seg string) *node {
 }
 
 // childOf 优先考虑静态匹配，匹配不上，再考虑通配符匹配
-func (n *node) childOf(path string) (*node, bool) {
+// 第一个返回值是子节点
+// 第二个是标记是否是路径参数
+// 第三个标记命中了没有
+func (n *node) childOf(path string) (*node, bool, bool) {
 	if n.children == nil {
-		return n.starChild, n.starChild != nil
+		if n.paramChild != nil {
+			return n.paramChild, true, true
+		}
+		return n.starChild, false, n.starChild != nil
 	}
 	child, ok := n.children[path]
 	if !ok {
-		return n.starChild, n.starChild != nil
+		if n.paramChild != nil {
+			return n.paramChild, true, true
+		}
+		return n.starChild, false, n.starChild != nil
 	}
-	return child, ok
+	return child, false, ok
 }
 
 // type tree struct {
@@ -155,6 +193,14 @@ type node struct {
 	// 加一个通配符匹配
 	starChild *node
 
+	// 加一个路径参数
+	paramChild *node
+
 	// 缺一个代表用户注册的业务逻辑
 	handler HandleFunc
+}
+
+type matchInfo struct {
+	n          *node
+	pathParams map[string]string
 }
