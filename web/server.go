@@ -54,14 +54,15 @@ func (h *HTTPServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 }
 
 func (h *HTTPServer) serve(ctx *Context) {
-	n, ok := h.findRoute(ctx.Req.Method, ctx.Req.URL.Path)
-	if !ok || n.handler == nil {
+	info, ok := h.findRoute(ctx.Req.Method, ctx.Req.URL.Path)
+	if !ok || info.n.handler == nil {
 		// 路由没有命中，就是 404
 		ctx.Resp.WriteHeader(404)
 		_, _ = ctx.Resp.Write([]byte("NOT FOUND"))
 		return
 	}
-	n.handler(ctx)
+	ctx.PathParams = info.pathParams
+	info.n.handler(ctx)
 }
 
 // 在这里注册路由
