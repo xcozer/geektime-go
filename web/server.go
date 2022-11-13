@@ -43,6 +43,7 @@ type HTTPServer struct {
 
 	log func(msg string, args...any)
 
+	tplEngine TemplateEngine
 }
 
 func NewHTTPServerV1(mdls ...Middleware) *HTTPServer {
@@ -71,6 +72,12 @@ func NewHTTPServer(opts ...HTTPServerOption) *HTTPServer {
 	return res
 }
 
+func ServerWithTemplateEngine(tplEngine TemplateEngine) HTTPServerOption {
+	return func(server *HTTPServer) {
+		server.tplEngine = tplEngine
+	}
+}
+
 func ServerWithMiddleware(mdls ...Middleware) HTTPServerOption {
 	return func(server *HTTPServer) {
 		server.mdls = mdls
@@ -83,6 +90,7 @@ func (h *HTTPServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 	ctx := &Context{
 		Req:  request,
 		Resp: writer,
+		tplEngine: h.tplEngine,
 	}
 
 	// 最后一个是这个

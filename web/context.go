@@ -28,6 +28,8 @@ type Context struct {
 
 	MatchedRoute string
 
+	tplEngine TemplateEngine
+
 	// cookieSameSite http.SameSite
 }
 
@@ -35,6 +37,32 @@ type Context struct {
 // func (c *Context) ErrPage() {
 //
 // }
+
+// 没特别大必要，因为一般都是使用 200 作为状态码
+// func (c *Context) Render(statusCode int, tplName string, data any) error {
+// 	var err error
+// 	c.RespData, err = c.tplEngine.Render(c.Req.Context(), tplName, data)
+// 	if err != nil {
+// 		c.RespStatusCode = 500
+// 		return err
+// 	}
+// 	c.RespStatusCode = statusCode
+// 	return nil
+// }
+
+func (c *Context) Render(tplName string, data any) error {
+	// 不要这样子去做
+	// tplName = tplName + ".gohtml"
+	// tplName = tplName + c.tplPrefix
+	var err error
+	c.RespData, err = c.tplEngine.Render(c.Req.Context(), tplName, data)
+	if err != nil {
+		c.RespStatusCode = http.StatusInternalServerError
+		return err
+	}
+	c.RespStatusCode = http.StatusOK
+	return nil
+}
 
 func (c *Context) SetCookie(ck *http.Cookie) {
 	// 不推荐
