@@ -30,6 +30,8 @@ type Context struct {
 
 	tplEngine TemplateEngine
 
+	UserValues map[string]any
+
 	// cookieSameSite http.SameSite
 }
 
