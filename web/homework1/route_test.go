@@ -99,7 +99,7 @@ func Test_router_AddRoute(t *testing.T) {
 							"home": {path: "home", handler: mockHandler, typ: nodeTypeStatic},
 						},
 						handler: mockHandler,
-						typ: nodeTypeStatic,
+						typ:     nodeTypeStatic,
 					},
 					"order": {
 						path: "order",
@@ -107,21 +107,21 @@ func Test_router_AddRoute(t *testing.T) {
 							"detail": {path: "detail", handler: mockHandler, typ: nodeTypeStatic},
 						},
 						starChild: &node{path: "*", handler: mockHandler, typ: nodeTypeAny},
-						typ: nodeTypeStatic,
+						typ:       nodeTypeStatic,
 					},
 					"param": {
 						path: "param",
 						paramChild: &node{
-							path: ":id",
+							path:      ":id",
 							paramName: "id",
 							starChild: &node{
 								path:    "*",
 								handler: mockHandler,
-								typ: nodeTypeAny,
+								typ:     nodeTypeAny,
 							},
 							children: map[string]*node{"detail": {path: "detail", handler: mockHandler, typ: nodeTypeStatic}},
 							handler:  mockHandler,
-							typ: nodeTypeParam,
+							typ:      nodeTypeParam,
 						},
 					},
 				},
@@ -132,15 +132,15 @@ func Test_router_AddRoute(t *testing.T) {
 							path:      "abc",
 							starChild: &node{path: "*", handler: mockHandler, typ: nodeTypeAny},
 							handler:   mockHandler,
-							typ: nodeTypeStatic,
+							typ:       nodeTypeStatic,
 						},
 					},
 					starChild: &node{path: "*", handler: mockHandler, typ: nodeTypeAny},
 					handler:   mockHandler,
-					typ: nodeTypeAny,
+					typ:       nodeTypeAny,
 				},
 				handler: mockHandler,
-				typ: nodeTypeStatic,
+				typ:     nodeTypeStatic,
 			},
 			http.MethodPost: {
 				path: "/",
@@ -157,22 +157,22 @@ func Test_router_AddRoute(t *testing.T) {
 				children: map[string]*node{
 					"reg": {
 						path: "reg",
-						typ: nodeTypeStatic,
+						typ:  nodeTypeStatic,
 						regChild: &node{
-							path: ":id(.*)",
+							path:      ":id(.*)",
 							paramName: "id",
-							typ: nodeTypeReg,
-							handler: mockHandler,
+							typ:       nodeTypeReg,
+							handler:   mockHandler,
 						},
 					},
 				},
 				regChild: &node{
-					path: ":name(^.+$)",
+					path:      ":name(^.+$)",
 					paramName: "name",
-					typ: nodeTypeReg,
+					typ:       nodeTypeReg,
 					children: map[string]*node{
 						"abc": {
-							path: "abc",
+							path:    "abc",
 							handler: mockHandler,
 						},
 					},
@@ -180,7 +180,7 @@ func Test_router_AddRoute(t *testing.T) {
 			},
 		},
 	}
-	msg, ok := wantRouter.equal(r)
+	msg, ok := wantRouter.equal(&r)
 	assert.True(t, ok, msg)
 
 	// 非法用例
@@ -267,7 +267,7 @@ func Test_router_AddRoute(t *testing.T) {
 	})
 }
 
-func (r router) equal(y router) (string, bool) {
+func (r *router) equal(y *router) (string, bool) {
 	for k, v := range r.trees {
 		yv, ok := y.trees[k]
 		if !ok {
@@ -491,7 +491,7 @@ func Test_router_findRoute(t *testing.T) {
 			name:   "overflow",
 			method: http.MethodPost,
 			path:   "/order/delete/123",
-			found: true,
+			found:  true,
 			mi: &matchInfo{
 				n: &node{
 					path:    "*",

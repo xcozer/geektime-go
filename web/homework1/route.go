@@ -1,7 +1,9 @@
 package web
 
 import (
+	"fmt"
 	"regexp"
+	"strings"
 )
 
 type router struct {
@@ -24,7 +26,50 @@ func newRouter() router {
 // - 不能在同一个位置同时注册通配符路由和参数路由，例如 /user/:id 和 /user/* 冲突
 // - 同名路径参数，在路由匹配的时候，值会被覆盖。例如 /user/:id/abc/:id，那么 /user/123/abc/456 最终 id = 456
 func (r *router) addRoute(method string, path string, handler HandleFunc) {
-	panic("implement me")
+	if path == "" {
+		panic("web: 路由是空字符串")
+	}
+
+	if path[0] != '/' {
+		panic("web: 路由必须以 / 开头")
+	}
+
+	if path != "/" && path[len(path)-1] == '/' {
+		panic("web: 路由不能以 / 结尾")
+	}
+
+	root, ok := r.trees[method]
+	if !ok {
+		root = &node{
+			path: "/",
+			typ:  nodeTypeStatic,
+		}
+		r.trees[method] = root
+	}
+
+	if path == "/" {
+		if root.handler != nil {
+			panic("web: 路由冲突[/]")
+		}
+
+		root.handler = handler
+		return
+	}
+
+	splitPaths := strings.Split(path[1:], "/")
+	for _, splitPath := range splitPaths {
+		if splitPath == "" {
+			panic(fmt.Sprintf("web: 非法路由。不允许使用 //a/b, /a//b 之类的路由, [%s]", path))
+		}
+
+		root = root.childOrCreate(splitPath)
+	}
+
+	if root.handler != nil {
+		panic(fmt.Sprintf("web: 路由冲突[%s]", path))
+	}
+
+	root.handler = handler
 }
 
 // findRoute 查找对应的节点
@@ -88,7 +133,87 @@ func (n *node) childOf(path string) (*node, bool) {
 // 最后会从 children 里面查找，
 // 如果没有找到，那么会创建一个新的节点，并且保存在 node 里面
 func (n *node) childOrCreate(path string) *node {
-	panic("implement me")
+	//通配符路由
+	if path == "*" {
+		if n.regChild != nil {
+			panic("web: 非法路由，已有正则路由。不允许同时注册通配符路由和正则路由 [*]")
+		}
+
+		if n.paramChild != nil {
+			panic("web: 非法路由，已有路径参数路由。不允许同时注册通配符路由和参数路由 [*]")
+		}
+
+		if n.starChild == nil {
+			n.starChild = &node{
+				path: path,
+				typ:  nodeTypeAny,
+			}
+		}
+		return n.starChild
+	}
+
+	//正则路由
+	if strings.HasPrefix(path, ":") && strings.Contains(path, "(") && strings.Contains(path, ")") {
+		if n.starChild != nil {
+			panic(fmt.Sprintf("web: 非法路由，已有通配符路由。不允许同时注册通配符路由和正则路由 [%s]", path))
+		}
+
+		if n.paramChild != nil {
+			panic(fmt.Sprintf("web: 非法路由，已有路径参数路由。不允许同时注册正则路由和参数路由 [%s]", path))
+		}
+
+		if n.regChild != nil && n.regChild.path != path {
+			panic("重复注册")
+		}
+
+		if n.regChild == nil {
+			n.regChild = &node{
+				path:      path,
+				typ:       nodeTypeReg,
+				paramName: path[1:strings.Index(path, "(")],
+			}
+		}
+		return n.regChild
+	}
+
+	//参数路由
+	if strings.HasPrefix(path, ":") {
+		if n.starChild != nil {
+			panic(fmt.Sprintf("web: 非法路由，已有通配符路由。不允许同时注册通配符路由和参数路由 [%s]", path))
+		}
+
+		if n.regChild != nil {
+			panic(fmt.Sprintf("web: 非法路由，已有正则路由。不允许同时注册正则路由和参数路由 [%s]", path))
+		}
+
+		if n.paramChild != nil && n.paramChild.path != path {
+			panic(fmt.Sprintf("web: 路由冲突，参数路由冲突，已有 %s，新注册 %s", n.paramChild.path, path))
+		}
+
+		if n.paramChild == nil {
+			n.paramChild = &node{
+				path:      path,
+				typ:       nodeTypeParam,
+				paramName: path[1:],
+			}
+		}
+		return n.paramChild
+	}
+
+	if n.children == nil {
+		n.children = make(map[string]*node)
+	}
+
+	//静态路由
+	child, ok := n.children[path]
+	if !ok {
+		child = &node{
+			path: path,
+			typ:  nodeTypeStatic,
+		}
+		n.children[path] = child
+	}
+	return child
 }
 
 type matchInfo struct {
