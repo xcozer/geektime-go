@@ -564,7 +564,7 @@ func Test_router_findRoute(t *testing.T) {
 			found:  true,
 			mi: &matchInfo{
 				n: &node{
-					path:    ":id(.*)",
+					path:    "home",
 					handler: mockHandler,
 				},
 				pathParams: map[string]string{"id": "123"},
@@ -591,6 +591,7 @@ func Test_router_findRoute(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tc.mi.pathParams, mi.pathParams)
+			assert.Equal(t, tc.mi.n.path, mi.n.path)
 			n := mi.n
 			wantVal := reflect.ValueOf(tc.mi.n.handler)
 			nVal := reflect.ValueOf(n.handler)

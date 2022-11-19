@@ -55,6 +55,7 @@ type User struct {
 }
 
 func initZipkin(t *testing.T) {
+	// 要注意这个端口，和 docker-compose 中的保持一致
 	exporter, err := zipkin.New(
 		"http://localhost:19411/api/v2/spans",
 		zipkin.WithLogger(log.New(os.Stderr, "opentelemetry-demo", log.Ldate|log.Ltime|log.Llongfile)),
