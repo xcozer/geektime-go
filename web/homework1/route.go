@@ -75,7 +75,37 @@ func (r *router) addRoute(method string, path string, handler HandleFunc) {
 // findRoute 查找对应的节点
 // 注意，返回的 node 内部 HandleFunc 不为 nil 才算是注册了路由
 func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
-	panic("implement me")
+	root, ok := r.trees[method]
+	if !ok {
+		return nil, false
+	}
+
+	if path == "/" {
+		return &matchInfo{n: root}, true
+	}
+
+	mi := &matchInfo{}
+	splitPaths := strings.Split(path[1:], "/")
+	for _, splitPath := range splitPaths {
+		root, ok = root.childOf(splitPath)
+		if !ok {
+			return nil, false
+		}
+
+		if root.typ == nodeTypeAny &&
+			root.children == nil && root.starChild == nil &&
+			root.paramChild == nil && root.regChild == nil {
+			break
+		}
+
+		if root.typ == nodeTypeParam || root.typ == nodeTypeReg {
+			mi.addValue(root.paramName, splitPath)
+		}
+	}
+
+	mi.n = root
+
+	return mi, true
 }
 
 type nodeType int
@@ -124,7 +154,28 @@ type node struct {
 // 第一个返回值 *node 是命中的节点
 // 第二个返回值 bool 代表是否命中
 func (n *node) childOf(path string) (*node, bool) {
-	panic("implement me")
+	if n.children != nil {
+		child, ok := n.children[path]
+		if ok {
+			return child, true
+		}
+	}
+
+	if n.regChild != nil {
+		if n.regChild.regExpr.MatchString(path) {
+			return n.regChild, true
+		}
+	}
+
+	if n.paramChild != nil {
+		return n.paramChild, true
+	}
+
+	if n.starChild != nil {
+		return n.starChild, true
+	}
+
+	return nil, false
 }
 
 // childOrCreate 查找子节点，
@@ -163,14 +214,21 @@ func (n *node) childOrCreate(path string) *node {
 		}
 
 		if n.regChild != nil && n.regChild.path != path {
-			panic("重复注册")
+			panic(fmt.Sprintf("web: 路由冲突，正则路由冲突，已有 %s，新注册 %s", n.regChild.path, path))
 		}
 
 		if n.regChild == nil {
+			leftIndex := strings.Index(path, "(")
+			regExpr, err := regexp.Compile(path[leftIndex+1 : len(path)-1])
+			if err != nil {
+				panic("web: 错误的正则表达式")
+			}
+
 			n.regChild = &node{
 				path:      path,
 				typ:       nodeTypeReg,
-				paramName: path[1:strings.Index(path, "(")],
+				paramName: path[1:leftIndex],
+				regExpr:   regExpr,
 			}
 		}
 		return n.regChild

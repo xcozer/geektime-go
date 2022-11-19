@@ -265,6 +265,13 @@ func Test_router_AddRoute(t *testing.T) {
 		r.addRoute(http.MethodGet, "/a/b/c/:id", mockHandler)
 		r.addRoute(http.MethodGet, "/a/b/c/:name", mockHandler)
 	})
+
+	// 重复注册
+	r = newRouter()
+	assert.PanicsWithValue(t, "web: 路由冲突，正则路由冲突，已有 :id(.*)，新注册 :name(.*)", func() {
+		r.addRoute(http.MethodGet, "/a/b/c/:id(.*)", mockHandler)
+		r.addRoute(http.MethodGet, "/a/b/c/:name(.*)", mockHandler)
+	})
 }
 
 func (r *router) equal(y *router) (string, bool) {
