@@ -27,6 +27,8 @@ type ConcurrentBlockingQueue[T any] struct {
 func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] {
 	m := &sync.Mutex{}
 	return &ConcurrentBlockingQueue[T]{
+		// 即便是 ring buffer，一次性分配完内存，也是有缺陷的
+		// 如果不想一开始就把所有的内存都分配好，可以用链表
 		data: make([]T, maxSize),
 		mutex: m,
 		// notFull: make(chan struct{}, 1),
@@ -37,6 +39,9 @@ func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] 
 	}
 }
 
+// func (c *ConcurrentBlockingQueue[T]) Get(index int) (T, error) {
+// 	index = (c.head + index) % c.maxSize
+// }
 
 func (c *ConcurrentBlockingQueue[T]) EnQueue(ctx context.Context, data T) error {
 	if ctx.Err() != nil {
@@ -49,13 +54,28 @@ func (c *ConcurrentBlockingQueue[T]) EnQueue(ctx context.Context, data T) error 
 			return err
 		}
 	}
-	// 可能引起扩容
+
+	// 按需扩容
+	// if len(c.data) < c.maxSize {
+	// 	c.data = append(c.data, data)
+	// 	c.tail ++
+	// 	c.count ++
+	// } else {
+	// 	c.data[c.tail] = data
+	// 	c.tail ++
+	// 	c.count ++
+	// 	if c.tail == c.maxSize {
+	// 		c.tail = 0
+	// 	}
+	// }
+
 	c.data[c.tail] = data
 	c.tail ++
 	c.count ++
 	if c.tail == c.maxSize {
 		c.tail = 0
 	}
+
 	c.notEmptyCond.Broadcast()
 	c.mutex.Unlock()
 	// 没有人等 notEmpty 的信号，这一句就会阻塞住
@@ -75,6 +95,9 @@ func (c *ConcurrentBlockingQueue[T]) DeQueue(ctx context.Context) (T, error) {
 			return t, err
 		}
 	}
+
+	// 这里要不要考虑缩容？
+
 	t := c.data[c.head]
 	c.data[c.head] = c.zero
 	c.head ++

@@ -124,3 +124,5 @@ func BenchmarkConcurrentQueue(b *testing.B) {
 	}()
 	wg.Wait()
 }
+
+
