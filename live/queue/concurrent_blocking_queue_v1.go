@@ -1,3 +1,4 @@
+//go:build v1
 package queue
 
 import (
