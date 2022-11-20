@@ -3,6 +3,8 @@ package queue
 import (
 	"context"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 )
 
 type ConcurrentBlockingQueue[T any] struct {
@@ -12,8 +14,8 @@ type ConcurrentBlockingQueue[T any] struct {
 	// notEmpty chan struct{}
 	maxSize int
 
-	notEmptyCond *cond
-	notFullCond *cond
+	notEmptyCond *Cond
+	notFullCond *Cond
 }
 
 func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] {
@@ -24,12 +26,8 @@ func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] 
 		// notFull: make(chan struct{}, 1),
 		// notEmpty: make(chan struct{}, 1),
 		maxSize: maxSize,
-		notFullCond: &cond{
-			Cond: sync.NewCond(m),
-		},
-		notEmptyCond: &cond{
-			Cond: sync.NewCond(m),
-		},
+		notFullCond: NewCond(m),
+		notEmptyCond: NewCond(m),
 	}
 }
 
@@ -40,13 +38,13 @@ func (c *ConcurrentBlockingQueue[T]) EnQueue(ctx context.Context, data T) error 
 	}
 	c.mutex.Lock()
 	for c.isFull() {
-		err := c.notFullCond.WaitTimeout(ctx)
+		err := c.notFullCond.WaitWithTimeout(ctx)
 		if err != nil {
 			return err
 		}
 	}
 	c.data = append(c.data, data)
-	c.notEmptyCond.Signal()
+	c.notEmptyCond.Broadcast()
 	c.mutex.Unlock()
 	// 没有人等 notEmpty 的信号，这一句就会阻塞住
 	return nil
@@ -59,7 +57,7 @@ func (c *ConcurrentBlockingQueue[T]) DeQueue(ctx context.Context) (T, error) {
 	}
 	c.mutex.Lock()
 	for c.isEmpty() {
-		err := c.notEmptyCond.WaitTimeout(ctx)
+		err := c.notEmptyCond.WaitWithTimeout(ctx)
 		if err != nil {
 			var t T
 			return t, err
@@ -67,7 +65,7 @@ func (c *ConcurrentBlockingQueue[T]) DeQueue(ctx context.Context) (T, error) {
 	}
 	t := c.data[0]
 	c.data = c.data[1:]
-	c.notFullCond.Signal()
+	c.notFullCond.Broadcast()
 	c.mutex.Unlock()
 	// 没有人等 notFull 的信号，这一句就会阻塞住
 	return t, nil
@@ -114,27 +112,53 @@ func (c *ConcurrentBlockingQueue[T]) Len() uint64 {
 // 	return nil
 // }
 
-type cond struct {
-	*sync.Cond
+// Conditional variable implementation that uses channels for notifications.
+// Only supports .Broadcast() method, however supports timeout based Wait() calls
+// unlike regular sync.Cond.
+type Cond struct {
+	L sync.Locker
+	n unsafe.Pointer
 }
 
-func (c *cond) WaitTimeout(ctx context.Context) error {
-	ch := make(chan struct{})
-	go func() {
-		c.Cond.Wait()
-		select {
-		case ch<- struct{}{}:
-		default:
-			// 这里已经超时返回了
-			c.Cond.Signal()
-			c.Cond.L.Unlock()
-		}
-	}()
+func NewCond(l sync.Locker) *Cond {
+	c := &Cond{L: l}
+	n := make(chan struct{})
+	c.n = unsafe.Pointer(&n)
+	return c
+}
+
+// Waits for Broadcast calls. Similar to regular sync.Cond, this unlocks the underlying
+// locker first, waits on changes and re-locks it before returning.
+func (c *Cond) Wait() {
+	n := c.NotifyChan()
+	c.L.Unlock()
+	<-n
+	c.L.Lock()
+}
+
+// Same as Wait() call, but will only wait up to a given timeout.
+func (c *Cond) WaitWithTimeout(ctx context.Context) error {
+	n := c.NotifyChan()
+	c.L.Unlock()
 	select {
-	case <- ctx.Done():
-		return ctx.Err()
-	case <- ch:
-		// 你真的被唤醒了
+	case <-n:
+		c.L.Lock()
 		return nil
+	case <- ctx.Done():
+		c.L.Lock()
+		return ctx.Err()
 	}
+}
+
+// Returns a channel that can be used to wait for next Broadcast() call.
+func (c *Cond) NotifyChan() <-chan struct{} {
+	ptr := atomic.LoadPointer(&c.n)
+	return *((*chan struct{})(ptr))
+}
+
+// Broadcast call notifies everyone that something has changed.
+func (c *Cond) Broadcast() {
+	n := make(chan struct{})
+	ptrOld := atomic.SwapPointer(&c.n, unsafe.Pointer(&n))
+	close(*(*chan struct{})(ptrOld))
 }
