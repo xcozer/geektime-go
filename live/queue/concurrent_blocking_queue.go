@@ -16,12 +16,18 @@ type ConcurrentBlockingQueue[T any] struct {
 
 	notEmptyCond *Cond
 	notFullCond *Cond
+
+	count int
+	head int
+	tail int
+
+	zero T
 }
 
 func NewConcurrentBlockingQueue[T any](maxSize int) *ConcurrentBlockingQueue[T] {
 	m := &sync.Mutex{}
 	return &ConcurrentBlockingQueue[T]{
-		data: make([]T, 0, maxSize),
+		data: make([]T, maxSize),
 		mutex: m,
 		// notFull: make(chan struct{}, 1),
 		// notEmpty: make(chan struct{}, 1),
@@ -43,7 +49,13 @@ func (c *ConcurrentBlockingQueue[T]) EnQueue(ctx context.Context, data T) error 
 			return err
 		}
 	}
-	c.data = append(c.data, data)
+	// 可能引起扩容
+	c.data[c.tail] = data
+	c.tail ++
+	c.count ++
+	if c.tail == c.maxSize {
+		c.tail = 0
+	}
 	c.notEmptyCond.Broadcast()
 	c.mutex.Unlock()
 	// 没有人等 notEmpty 的信号，这一句就会阻塞住
@@ -63,8 +75,13 @@ func (c *ConcurrentBlockingQueue[T]) DeQueue(ctx context.Context) (T, error) {
 			return t, err
 		}
 	}
-	t := c.data[0]
-	c.data = c.data[1:]
+	t := c.data[c.head]
+	c.data[c.head] = c.zero
+	c.head ++
+	c.count --
+	if c.head == c.maxSize {
+		c.head = 0
+	}
 	c.notFullCond.Broadcast()
 	c.mutex.Unlock()
 	// 没有人等 notFull 的信号，这一句就会阻塞住
@@ -78,7 +95,7 @@ func (c *ConcurrentBlockingQueue[T]) IsFull() bool {
 }
 
 func (c *ConcurrentBlockingQueue[T]) isFull() bool {
-	return len(c.data) == c.maxSize
+	return c.count == c.maxSize
 }
 
 func (c *ConcurrentBlockingQueue[T]) IsEmpty() bool {
@@ -89,11 +106,13 @@ func (c *ConcurrentBlockingQueue[T]) IsEmpty() bool {
 
 
 func (c *ConcurrentBlockingQueue[T]) isEmpty() bool {
-	return len(c.data) == 0
+	return c.count == 0
 }
 
 func (c *ConcurrentBlockingQueue[T]) Len() uint64 {
-	return uint64(len(c.data))
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return uint64(c.count)
 }
 
 
