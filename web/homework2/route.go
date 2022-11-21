@@ -24,7 +24,7 @@ func newRouter() router {
 // - 不能在同一个位置注册不同的参数路由，例如 /user/:id 和 /user/:name 冲突
 // - 不能在同一个位置同时注册通配符路由和参数路由，例如 /user/:id 和 /user/* 冲突
 // - 同名路径参数，在路由匹配的时候，值会被覆盖。例如 /user/:id/abc/:id，那么 /user/123/abc/456 最终 id = 456
-func (r *router) addRoute(method string, path string, handler HandleFunc, ms...Middleware) {
+func (r *router) addRoute(method string, path string, handler HandleFunc, ms ...Middleware) {
 	if path == "" {
 		panic("web: 路由是空字符串")
 	}
@@ -32,7 +32,7 @@ func (r *router) addRoute(method string, path string, handler HandleFunc, ms...M
 		panic("web: 路由必须以 / 开头")
 	}
 
-	if path != "/" && path[len(path) - 1] == '/' {
+	if path != "/" && path[len(path)-1] == '/' {
 		panic("web: 路由不能以 / 结尾")
 	}
 
@@ -99,7 +99,39 @@ func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 }
 
 func (r *router) findMdls(root *node, segs []string) []Middleware {
-	panic("implement me")
+	var mdls []Middleware
+	if len(root.mdls) > 0 {
+		mdls = append(mdls, root.mdls...)
+	}
+
+	parentNodes := []*node{root}
+	for _, s := range segs {
+		var matchableNodes []*node
+		for _, n := range parentNodes {
+			if n.starChild != nil {
+				matchableNodes = append(matchableNodes, n.starChild)
+			}
+			if n.paramChild != nil {
+				matchableNodes = append(matchableNodes, n.paramChild)
+			}
+
+			next, _, ok := n.childOf(s)
+			if ok && n.starChild != next && n.paramChild != next {
+				matchableNodes = append(matchableNodes, next)
+			}
+		}
+
+		for _, n := range matchableNodes {
+			if len(n.mdls) > 0 {
+				mdls = append(mdls, n.mdls...)
+			}
+		}
+
+		parentNodes = matchableNodes
+		root = parentNodes[len(parentNodes)-1]
+	}
+
+	return mdls
 }
 
 // node 代表路由树的节点
@@ -211,15 +243,15 @@ func (n *node) childOrCreate(path string) *node {
 }
 
 type matchInfo struct {
-	n *node
+	n          *node
 	pathParams map[string]string
-	mdls []Middleware
+	mdls       []Middleware
 }
 
 func (m *matchInfo) addValue(key string, value string) {
 	if m.pathParams == nil {
 		// 大多数情况，参数路径只会有一段
-		m.pathParams = map[string]string{key:value}
+		m.pathParams = map[string]string{key: value}
 	}
 	m.pathParams[key] = value
 }
