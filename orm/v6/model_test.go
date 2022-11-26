@@ -3,7 +3,7 @@
 package orm
 
 import (
-	"github.com/flycash/geekbang-middle-camp/orm/internal/errs"
+	"gitee.com/geektime-geekbang/geektime-go/orm/v6/internal/errs"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

@@ -2,7 +2,7 @@
 
 package orm
 
-import "github.com/flycash/geekbang-middle-camp/orm/internal/errs"
+import "gitee.com/geektime-geekbang/geektime-go/orm/v6/internal/errs"
 
 type ModelOpt func(model *Model) error
 

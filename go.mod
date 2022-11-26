@@ -3,6 +3,7 @@ module gitee.com/geektime-geekbang/geektime-go
 go 1.18
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/beego/beego/v2 v2.0.5
 	github.com/gin-contrib/sessions v0.0.5
 	github.com/gin-gonic/gin v1.8.1
@@ -13,6 +14,7 @@ require (
 	github.com/kataras/iris/v12 v12.1.8
 	github.com/labstack/echo-contrib v0.13.0
 	github.com/labstack/echo/v4 v4.9.1
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.12.2
 	github.com/stretchr/testify v1.8.0
