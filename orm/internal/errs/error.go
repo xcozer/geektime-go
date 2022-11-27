@@ -9,6 +9,8 @@ var (
 	ErrPointerOnly = errors.New("orm: 只支持指向结构体的一级指针")
 
 	// errUnsupportedExpression = errors.New("orm: 不支持的表达式类型")
+
+	ErrNoRows = errors.New("orm: 没有数据")
 )
 
 // func NewErrUnsupportedExpressionV1(expr any) error {
@@ -23,6 +25,10 @@ func NewErrUnsupportedExpression(expr any) error {
 
 func NewErrUnknownField(name string) error {
 	return fmt.Errorf("orm: 未知字段 %s", name)
+}
+
+func NewErrUnknownColumn(name string) error {
+	return fmt.Errorf("orm: 未知列 %s", name)
 }
 
 func NewErrInvalidTagContent(pair string) error {

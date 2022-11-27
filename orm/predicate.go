@@ -5,6 +5,7 @@ type op string
 
 const (
 	opEq op = "="
+	opLT op = "<"
 	opNot op = "NOT"
 	opAnd op = "AND"
 	opOr op = "OR"

@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"gitee.com/geektime-geekbang/geektime-go/orm/internal/errs"
+	"reflect"
 	"strings"
 )
 
@@ -110,7 +111,7 @@ func (s *Selector[T]) buildExpression(expr Expression) error {
 			s.sb.WriteByte(')')
 		}
 	case Column:
-		fd, ok := s.model.fields[exp.name]
+		fd, ok := s.model.fieldMap[exp.name]
 		// 字段不对，或者说列不对
 		if !ok {
 			return errs.NewErrUnknownField(exp.name)
@@ -152,12 +153,86 @@ func (s *Selector[T]) Where(ps...Predicate) *Selector[T] {
 }
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
-	// TODO implement me
-	panic("implement me")
+	q, err := s.Build()
+	// 这个是构造 SQL 失败
+	if err != nil {
+		return nil, err
+	}
+
+	db := s.db.db
+	// 在这里，就是要发起查询，并且处理结果集
+	rows, err := db.QueryContext(ctx, q.SQL, q.Args...)
+	// 这个是查询错误
+	if err != nil {
+		return nil, err
+	}
+
+	// 你要确认有没有数据
+	if !rows.Next() {
+		// 要不要返回 error？
+		// 返回 error，和 sql 包语义保持一致
+		return nil, ErrNoRows
+	}
+
+	// 在这里，继续处理结果集
+
+	// 我怎么知道你 SELECT 出来了哪些列？
+	// 拿到了 SELECT 出来的列
+	cs, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	// 怎么利用 cs 来解决顺序问题和类型问题
+
+	tp := new(T)
+
+
+	// 通过 cs 来构造 vals
+	// 怎么构造呢？
+	vals := make([]any, 0, len(cs))
+	valElems := make([]reflect.Value, 0, len(cs))
+	for _, c := range cs {
+		// c 是列名
+		fd, ok := s.model.columnMap[c]
+		if !ok {
+			return nil, errs.NewErrUnknownColumn(c)
+		}
+		// 反射创建一个实例
+		// 这里创建的实例是原本类型的指针类型
+		// 例如 fd.Type = int，那么val 是 *int
+		val := reflect.New(fd.typ)
+		vals = append(vals, val.Interface())
+		// 记得要调用 Elem，因为 fd.Type = int，那么val 是 *int
+		valElems = append(valElems, val.Elem())
+	}
+
+	// 第一个问题：类型要匹配
+	// 第二个问题：顺序要匹配
+
+	// SELECT id, first_name, age, last_name
+	// SELECT first_name, age, last_name, id
+	err = rows.Scan(vals...)
+	if err != nil {
+		return nil, err
+	}
+
+	// 想办法把 vals 塞进去 结果 tp 里面
+	tpValueElem := reflect.ValueOf(tp).Elem()
+	for i, c := range cs {
+		// c 是列名
+		fd, ok := s.model.columnMap[c]
+		if !ok {
+			return nil, errs.NewErrUnknownColumn(c)
+		}
+		tpValueElem.FieldByName(fd.goName).
+			Set(valElems[i])
+	}
+
+	return tp, nil
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	// TODO implement me
 	panic("implement me")
 }
 
