@@ -10,6 +10,7 @@ require (
 	github.com/go-redis/redis/v9 v9.0.0-rc.1
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/sessions v1.2.1
+	github.com/gotomicro/ekit v0.0.4
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/kataras/iris/v12 v12.1.8
 	github.com/labstack/echo-contrib v0.13.0

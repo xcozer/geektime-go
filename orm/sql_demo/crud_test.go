@@ -121,6 +121,18 @@ func TestPrepareStatement(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
+	_, err = db.ExecContext(context.Background(), `
+CREATE TABLE IF NOT EXISTS test_model(
+    id INTEGER PRIMARY KEY,
+    first_name TEXT NOT NULL,
+    age INTEGER,
+    last_name TEXT NOT NULL
+)
+`)
+
+	// 完成了建表
+	require.NoError(t, err)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	stmt, err := db.PrepareContext(ctx, "SELECT * FROM `test_model` WHERE `id`=?")
 	require.NoError(t, err)

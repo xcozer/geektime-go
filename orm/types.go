@@ -31,6 +31,3 @@ type Query struct {
 	Args []any
 }
 
-type TableName interface {
-	TableName() string
-}

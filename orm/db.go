@@ -1,13 +1,18 @@
 package orm
 
-import "database/sql"
+import (
+	"database/sql"
+	"gitee.com/geektime-geekbang/geektime-go/orm/internal/valuer"
+	"gitee.com/geektime-geekbang/geektime-go/orm/model"
+)
 
 type DBOption func(db *DB)
 
 // DB 是一个 sql.DB 的装饰器
 type DB struct {
-	r *registry
+	r model.Registry
 	db *sql.DB
+	creator valuer.Creator
 }
 
 func Open(driver string, dataSourceName string, opts...DBOption) (*DB, error) {
@@ -20,13 +25,26 @@ func Open(driver string, dataSourceName string, opts...DBOption) (*DB, error) {
 
 func OpenDB(db *sql.DB, opts...DBOption) (*DB, error) {
 	res := &DB{
-		r: newRegistry(),
+		r:  model.NewRegistry(),
 		db: db,
+		creator: valuer.NewUnsafeValue,
 	}
 	for _, opt := range opts {
 		opt(res)
 	}
 	return res, nil
+}
+
+func DBWithRegistry(r model.Registry) DBOption {
+	return func(db *DB) {
+		db.r = r
+	}
+}
+
+func DBUseReflect() DBOption {
+	return func(db *DB) {
+		db.creator = valuer.NewReflectValue
+	}
 }
 
 func MustOpen(driver string, dataSourceName string, opts...DBOption) *DB {
