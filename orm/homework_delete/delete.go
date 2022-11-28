@@ -8,7 +8,7 @@ func (d *Deleter[T]) Build() (*Query, error) {
 }
 
 // From accepts model definition
-func (d *Deleter[T]) From(table interface{}) *Deleter[T] {
+func (d *Deleter[T]) From(table string) *Deleter[T] {
 	panic("implement me ")
 }
 
