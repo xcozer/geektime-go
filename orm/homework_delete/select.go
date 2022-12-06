@@ -39,9 +39,11 @@ func (s *Selector[T]) Build() (*Query, error) {
 		for i := 1; i < len(s.where); i++ {
 			p = p.And(s.where[i])
 		}
-		if err := s.buildExpression(p); err != nil {
+		args, err := buildExpression(&s.sb, p)
+		if err != nil {
 			return nil, err
 		}
+		s.args = args
 	}
 	s.sb.WriteString(";")
 	return &Query{
